@@ -99,10 +99,19 @@ const TlpProxy = GObject.registerClass({
         ];
     }
 
+    /**
+     * Get all profiles
+     * @returns {[{profileName: string, name: *, description: string, id: string, profilePath: *, enabled: boolean, indicatorIcon: string},{profileName: string, name: *, description: string, id: string, profilePath: *, enabled: boolean, indicatorIcon: string},{profileName: string, name: *, description: string, id: string, profilePath: *, enabled: boolean, indicatorIcon: string}]}
+     */
     getProfiles() {
         return this._profiles;
     }
 
+    /**
+     * Get profile by id
+     * @param profileId
+     * @returns {null|{profileName: string, name: *, description: string, id: string, profilePath: *, enabled: boolean, indicatorIcon: string}|{profileName: string, name: *, description: string, id: string, profilePath: *, enabled: boolean, indicatorIcon: string}|{profileName: string, name: *, description: string, id: string, profilePath: *, enabled: boolean, indicatorIcon: string}}
+     */
     getProfile(profileId) {
         for (const p of this._profiles) {
             if (p.id === profileId)
@@ -135,12 +144,12 @@ const TlpProxy = GObject.registerClass({
             return;
         }
 
-        // find out with profile is active
+        // find out witch profile is active
         const activeProfilesIter = await systemProfileDir.enumerate_children_async('standard::*', Gio.FileQueryInfoFlags.NOFOLLOW_SYMLINKS, GLib.PRIORITY_DEFAULT, null);
         for await (const info of activeProfilesIter) {
             if (info.get_name() === this._activeProfileName) {
-                const path = GLib.build_filenamev([this._activeProfileDir, info.get_name()]);
-                const activeProfile = Gio.File.new_for_path(path);
+                // read and parse profile file
+                const activeProfile = Gio.File.new_for_path(GLib.build_filenamev([this._activeProfileDir, info.get_name()]));
                 const activeProfileStream = await activeProfile.read_async(GLib.PRIORITY_DEFAULT, null);
                 const headerBytes = await activeProfileStream.read_bytes_async(4096, GLib.PRIORITY_DEFAULT, null);
                 const decoder = new TextDecoder('utf-8');
@@ -148,6 +157,7 @@ const TlpProxy = GObject.registerClass({
                 const firstLineEnd = headerContent.search('\n');
                 const firstLine = headerContent.substring(0, firstLineEnd).trim();
                 let currentActiveProfileId = '';
+                // the first line contains profile id
                 for (let c of this._profiles) {
                     const pos = firstLine.search(c.id);
                     if (pos !== -1) {
@@ -163,19 +173,12 @@ const TlpProxy = GObject.registerClass({
         }
 
         // detect and create user config path
-        console.info("visit %s", this._userProfileDir);
         const userProfileDir = Gio.File.new_for_path(this._userProfileDir);
         if (!await userProfileDir.query_exists(null)) {
-            const createUserProfileDirSuccess = await userProfileDir.make_directory_async(GLib.PRIORITY_DEFAULT, null);
-            if (createUserProfileDirSuccess) {
-                console.info("create user profile dir %s", this._userProfileDir);
-            } else {
-                console.error("failed to create profile dir %s", this._userProfileDir);
-            }
+            await userProfileDir.make_directory_async(GLib.PRIORITY_DEFAULT, null);
         }
 
         // detect and create user configs
-        console.info("visit %s: configs", this._userProfileDir);
         for (let c of this._profiles) {
             c.enabled = this._detectProfile(c);
         }
@@ -190,6 +193,7 @@ const TlpProxy = GObject.registerClass({
     async _detectProfile(profile) {
         let fileExists = false;
         const profileFile = Gio.File.new_for_path(profile.profilePath);
+        // create an empty profile
         if (!await profileFile.query_exists(null)) {
             const profileStream = await profileFile.create_async(Gio.FileCreateFlags.NONE, GLib.PRIORITY_DEFAULT, null);
             if (profileStream) {
@@ -204,14 +208,19 @@ const TlpProxy = GObject.registerClass({
         return fileExists;
     }
 
+    /**
+     * Switch profile by id
+     * @param profileId
+     * @returns {Promise<void>}
+     * @private
+     */
     async _switchProfile(profileId) {
-        console.debug("start switch profile to", profileId)
         for (const p of this._profiles) {
             if (p.id === profileId) {
                 const sourceProfile = p.profilePath;
                 const target = GLib.build_filenamev([this._activeProfileDir, this._activeProfileName])
 
-                // generate profile
+                // generate temporary profile
                 const tmpPath = GLib.build_filenamev([this._userProfileDir, ".tmp_tlp_profile.conf"])
                 const tmpFile = Gio.File.new_for_path(tmpPath);
                 const tmpStream = await tmpFile.replace_async(null, false, Gio.FileCreateFlags.NONE, null, null);
@@ -234,14 +243,20 @@ const TlpProxy = GObject.registerClass({
                 const [stdout, stderr] = await proc.communicate_utf8_async(null, null);
                 await tmpFile.delete_async(GLib.PRIORITY_DEFAULT, null);
                 if (stderr.length !== 0) {
+                    this._setActiveProfileId(this._activeProfileId);
                     throw stderr;
+                } else {
+                    this._setActiveProfileId(profileId);
                 }
-
-                this._setActiveProfileId(profileId);
             }
         }
     }
 
+    /**
+     * Change active profile id and notify
+     * @param id profile id
+     * @private
+     */
     _setActiveProfileId(id) {
         this._activeProfileId = id;
         this.notify('activeProfile');
@@ -265,11 +280,7 @@ const TlpProfileMenuToggle = GObject.registerClass(
             for (const p of profiles) {
                 if (p.enabled) {
                     const item = new PopupMenu.PopupImageMenuItem(p.name, p.indicatorIcon);
-                    item.connect('activate',
-                        () => {
-                            tlpConfig.activeProfile = p.id;
-                        }
-                    );
+                    item.connect('activate', () => { tlpConfig.activeProfile = p.id; });
                     tlpConfig.connect("activeProfileChanged", (sender, profile) => {
                         item.setOrnament(p.id === profile ? PopupMenu.Ornament.CHECK : PopupMenu.Ornament.NONE);
                     })
