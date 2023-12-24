@@ -1,0 +1,8 @@
+{
+  "name": "TLP profile",
+  "description": "Switch between tlp profiles",
+  "uuid": "tlpprofile@extension.com",
+  "shell-version": [
+    "45"
+  ]
+}
