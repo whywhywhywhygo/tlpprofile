@@ -1,9 +1,10 @@
 {
   "name": "TLP profile",
   "description": "Switch between tlp profiles",
-  "uuid": "tlpprofile@extension.com",
+  "uuid": "tlpprofile@whywhywhywhygo.extension",
   "shell-version": [
     "45"
   ],
-  "url": "https://github.com/whywhywhywhygo/tlpprofile"
+  "url": "https://github.com/whywhywhywhygo/tlpprofile",
+  "version": 0
 }
