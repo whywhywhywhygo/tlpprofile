@@ -236,8 +236,8 @@ const TlpProxy = GObject.registerClass({
                     await tmpStream.write_bytes_async(profileContent, GLib.PRIORITY_DEFAULT, null);
                 } while (profileContent.get_size() !== 0)
 
-                // copy to tlp config dir
-                const proc = Gio.Subprocess.new(['/usr/bin/pkexec', 'cp', tmpPath, target],
+                const [, argv2] = GLib.shell_parse_argv(`pkexec sh -c 'cp ${tmpPath} ${target}; tlp start;'`);
+                const proc = Gio.Subprocess.new(argv2,
                     Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE);
 
                 const [stdout, stderr] = await proc.communicate_utf8_async(null, null);
