@@ -294,7 +294,7 @@ const TlpProfileMenuToggle = GObject.registerClass(
             this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
             this.connect('clicked', () => {
-                tlpConfig.activeProfile = tlpConfig.activeProfile === ProfileIdBalanced ? ProfileIdPowerSaver : ProfileIdPerformance;
+                tlpConfig.activeProfile = tlpConfig.activeProfile === ProfileIdBalanced ? ProfileIdPerformance : ProfileIdBalanced;
             });
         }
     });
